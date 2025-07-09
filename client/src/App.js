@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 
-const socket = io("https://your-backend.onrender.com"); // change this later
+const socket = io("https://multiplayerwordgame.onrender.com/"); // change this later
 
 function App() {
   const [roomId, setRoomId] = useState("");
