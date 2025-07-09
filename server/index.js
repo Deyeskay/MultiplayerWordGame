@@ -34,39 +34,37 @@ io.on('connection', (socket) => {
     let player = room.players.find(p => p.uuid === playerUUID);
 
     if (player) {
-      // Rejoin
+      // ✅ Rejoin
       player.socketId = socket.id;
-      io.to(roomId).emit("player-rejoined", player.name);
 
-      // ✅ Restore game state if already started
-      if (room.gameStarted) {
-        io.to(socket.id).emit("your-word", {
-          word: player.word,
-          isFake: player.isFake
-        });
+      // Resend personal game state
+      io.to(socket.id).emit("chat-history", room.chat);
+      io.to(socket.id).emit("your-word", {
+        word: player.word,
+        isFake: player.isFake
+      });
 
-        const currentPlayer = room.players[room.turnIndex];
-        io.to(roomId).emit("turn-update", currentPlayer.name);
-
-        // Optional: Send back all words for consistency
-        io.to(socket.id).emit("all-words", room.players.map(p => p.word));
+      io.to(socket.id).emit("all-words", room.players.map(p => p.word));
+      const currentPlayer = room.players[room.turnIndex];
+      if (currentPlayer) {
+        io.to(socket.id).emit("turn-update", currentPlayer.name);
       }
 
+      io.to(roomId).emit("player-rejoined", player.name);
     } else {
-      // New join
-      player = { uuid: playerUUID, name: playerName, socketId: socket.id, word: "", isFake: false };
+      // New Join
+      player = {
+        uuid: playerUUID,
+        name: playerName,
+        socketId: socket.id,
+        word: "",
+        isFake: false
+      };
       room.players.push(player);
       io.to(roomId).emit("player-joined", playerName);
     }
 
-    // Update room and chat history
-    io.to(roomId).emit("room-update", room.players); 
-    
-    // Wait 100ms to ensure frontend is ready to receive
-    setTimeout(() => {
-      io.to(socket.id).emit("chat-history", room.chat);
-    }, 100);
- 
+    io.to(roomId).emit("room-update", room.players);
   });
 
   socket.on("start-game", (roomId) => {
@@ -75,16 +73,21 @@ io.on('connection', (socket) => {
 
     room.gameStarted = true;
 
-    const shuffledWords = [...genuineWords, fakeWord].sort(() => 0.5 - Math.random()).slice(0, room.players.length);
+    const shuffledWords = [...genuineWords, fakeWord]
+      .sort(() => 0.5 - Math.random())
+      .slice(0, room.players.length);
+
     room.players.forEach((p, i) => {
       p.word = shuffledWords[i];
       p.isFake = (p.word === fakeWord);
-      io.to(p.socketId).emit("your-word", { word: p.word, isFake: p.isFake });
+      io.to(p.socketId).emit("your-word", {
+        word: p.word,
+        isFake: p.isFake
+      });
     });
 
     io.to(roomId).emit("all-words", room.players.map(p => p.word));
 
-    // Start turn sequence
     room.turnIndex = 0;
     const currentPlayer = room.players[room.turnIndex];
     io.to(roomId).emit("turn-update", currentPlayer.name);
@@ -98,7 +101,6 @@ io.on('connection', (socket) => {
     room.chat.push(chatMsg);
     io.to(roomId).emit("new-message", chatMsg);
 
-    // Advance turn
     room.turnIndex = (room.turnIndex + 1) % room.players.length;
     const nextPlayer = room.players[room.turnIndex];
     io.to(roomId).emit("turn-update", nextPlayer.name);
@@ -110,7 +112,7 @@ io.on('connection', (socket) => {
 
     room.players = room.players.filter(p => p.uuid !== playerUUID);
 
-    // Notify everyone except the leaving player
+    // Notify others only
     socket.to(roomId).emit("player-left", { name: playerName, id: socketId });
     io.to(roomId).emit("room-update", room.players);
 
@@ -133,7 +135,6 @@ io.on('connection', (socket) => {
       const room = rooms[roomId];
       const player = room.players.find(p => p.socketId === socket.id);
       if (player) {
-        // Keep in list; allow reconnection
         io.to(roomId).emit("room-update", room.players);
         break;
       }
