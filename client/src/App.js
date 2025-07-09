@@ -114,7 +114,8 @@ function App() {
 
   const joinRoom = () => {
     if (!roomId || !playerName) return showModalNow("Enter Room ID and Name");
-    socket.emit("join-room", { roomId, playerName, playerUUID });
+    socket.emit("join-room", { roomId, playerName, playerUUID: playerUUID });
+
     setStep("lobby");
   };
 
