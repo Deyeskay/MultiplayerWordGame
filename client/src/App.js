@@ -1,12 +1,13 @@
+// client/src/App.js
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 
-const socket = io("https://multiplayerwordgame.onrender.com/"); // change this later
+const socket = io("https://multiplayerwordgame.onrender.com/"); // replace with your backend URL
 
 function App() {
+  const [step, setStep] = useState("join");
   const [roomId, setRoomId] = useState("");
   const [playerName, setPlayerName] = useState("");
-  const [joined, setJoined] = useState(false);
   const [players, setPlayers] = useState([]);
   const [yourWord, setYourWord] = useState("");
   const [isFake, setIsFake] = useState(false);
@@ -14,60 +15,78 @@ function App() {
   const [chat, setChat] = useState([]);
   const [message, setMessage] = useState("");
 
-  const joinRoom = () => {
-    socket.emit("join-room", { roomId, playerName });
-    setJoined(true);
-  };
-
-  const startGame = () => {
-    socket.emit("start-game", roomId);
-  };
-
-  const sendMessage = () => {
-    socket.emit("send-message", { roomId, playerName, message });
-    setMessage("");
-  };
-
   useEffect(() => {
-    socket.on("room-update", setPlayers);
-    socket.on("your-word", ({ word, isFake }) => {
+    socket.on("room-update", players => setPlayers(players));
+    socket.on("your-word", ({word, isFake}) => {
       setYourWord(word);
       setIsFake(isFake);
+      setStep("in-game");
     });
-    socket.on("all-words", setWords);
-    socket.on("new-message", (msg) => setChat(prev => [...prev, msg]));
+    socket.on("all-words", ws => setWords(ws));
+    socket.on("new-message", msg => setChat(prev => [...prev, msg]));
+    return () => socket.off();
   }, []);
 
-  if (!joined) {
-    return (
-      <div>
-        <h1>Join Game</h1>
-        <input placeholder="Room ID" onChange={(e) => setRoomId(e.target.value)} />
-        <input placeholder="Your Name" onChange={(e) => setPlayerName(e.target.value)} />
-        <button onClick={joinRoom}>Join</button>
-      </div>
-    );
+  function joinRoom() {
+    if (!roomId || !playerName) return alert("Enter both fields");
+    socket.emit("join-room", {roomId, playerName});
+    setStep("lobby");
+  }
+
+  function startGame() {
+    socket.emit("start-game", roomId);
+  }
+
+  function sendMessage() {
+    if (!message) return;
+    socket.emit("send-message", {roomId, playerName, message});
+    setMessage("");
   }
 
   return (
-    <div>
-      <h1>Room: {roomId}</h1>
-      <h2>Players:</h2>
-      <ul>{players.map(p => <li key={p.id}>{p.name}</li>)}</ul>
-      <button onClick={startGame}>Start Game</button>
+    <div style={{ padding: 20, fontFamily: "sans-serif", maxWidth: 600, margin: "auto" }}>
+      <h1>MultiplayerWordGame</h1>
 
-      <h2>Your Word: {yourWord} - {isFake ? "Fake" : "Genuine"}</h2>
-      <h2>All Words:</h2>
-      <ul>{words.map((w, i) => <li key={i}>{w}</li>)}</ul>
+      {step === "join" && (
+        <>
+          <input placeholder="Room ID" value={roomId} onChange={e => setRoomId(e.target.value)} />
+          <input placeholder="Player Name" value={playerName} onChange={e => setPlayerName(e.target.value)} />
+          <button onClick={joinRoom}>Join Room</button>
+        </>
+      )}
 
-      <div>
-        <h2>Chat</h2>
-        {chat.map((msg, i) => (
-          <p key={i}><strong>{msg.playerName}:</strong> {msg.message}</p>
-        ))}
-        <input value={message} onChange={e => setMessage(e.target.value)} />
-        <button onClick={sendMessage}>Send</button>
-      </div>
+      {step === "lobby" && (
+        <>
+          <h2>Room: {roomId}</h2>
+          <h3>Players:</h3>
+          <ul>{players.map(p => <li key={p.id}>{p.name}</li>)}</ul>
+          <button onClick={startGame}>Start Game</button>
+        </>
+      )}
+
+      {step === "in-game" && (
+        <>
+          <h2>Your Word: <strong>{yourWord}</strong> — {isFake ? "Fake" : "Genuine"}</h2>
+          <h3>All Words This Round:</h3>
+          <ul>{words.map((w, i) => <li key={i}>{w}</li>)}</ul>
+
+          <div style={{ marginTop: 20 }}>
+            <h3>Chat</h3>
+            <div style={{ border: "1px solid #ccc", padding: 10, height: 200, overflowY: "auto" }}>
+              {chat.map((msg, i) => (
+                <p key={i}><strong>{msg.playerName}:</strong> {msg.message}</p>
+              ))}
+            </div>
+            <input
+              style={{ width: "80%" }}
+              placeholder="Type your hint..."
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+            />
+            <button onClick={sendMessage}>Send</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
