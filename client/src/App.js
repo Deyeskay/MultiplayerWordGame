@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 
 const socket = io("https://multiplayerwordgame.onrender.com/"); // replace with your backend URL
-
+console.log("🚀 App.js loaded");
 function App() {
   const [step, setStep] = useState("join");
   const [roomId, setRoomId] = useState("");
