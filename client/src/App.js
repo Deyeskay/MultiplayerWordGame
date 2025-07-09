@@ -60,19 +60,17 @@ function App() {
     });
 
     socket.on("game-ended", (hostName) => {
-      const msg = hostName === playerName ? "⚠️ You ended the game." : `⚠️ Host ${hostName} ended the game.`;
+      const msg = hostName === playerName
+        ? "⚠️ You ended the game."
+        : `⚠️ Host ${hostName} ended the game.`;
       showModalNow(msg);
       setTimeout(() => resetGame(), 1000);
     });
 
-    // Rejoin automatically if session exists
     if (roomId && playerName) {
-      socket.on("connect", () => {
-        socket.emit("join-room", { roomId, playerName, playerUUID });
-        setStep("lobby");
-      });
+      socket.emit("join-room", { roomId, playerName, playerUUID });
+      setStep("lobby");
     }
-
 
     return () => socket.off();
   }, [playerName]);
@@ -154,7 +152,7 @@ function App() {
           onExit={confirmLeave}
         />
       )}
-      {step === "in-game" && (
+      {step === "in-game" && yourWord && words.length > 0 && (
         <GameScreen
           playerName={playerName}
           currentTurn={currentTurn}
@@ -168,6 +166,7 @@ function App() {
           onLeave={confirmLeave}
           onEnd={confirmEnd}
           isHost={isHost}
+          players={players}
         />
       )}
 

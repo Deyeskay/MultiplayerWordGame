@@ -1,52 +1,53 @@
-import React from "react";
-import ChatBox from "../components/ChatBox";
-import WordDisplay from "../components/WordDisplay";
-import InputBar from "../components/InputBar";
-import TopBar from "../components/TopBar";
+import React from 'react';
+import TopBar from '../components/TopBar';
+import PlayerList from '../components/PlayerList';
+import WordDisplay from '../components/WordDisplay';
+import ChatBox from '../components/ChatBox';
+import InputBar from '../components/InputBar';
 
-export default function GameScreen({
+const GameScreen = ({
   playerName,
-  roomId,
-  isHost,
-  players,
   currentTurn,
-  yourWord,
+  word,
   isFake,
   words,
   chat,
   message,
-  setMessage,
+  onMessageChange,
   onSend,
-  onExit,
+  onLeave,
   onEnd,
-}) {
+  isHost,
+  players = []
+}) => {
+  if (!word || !Array.isArray(words) || words.length === 0) {
+    return <div>Loading game...</div>; // avoid blank screen
+  }
+
   return (
     <>
       <TopBar
         playerName={playerName}
-        roomId={roomId}
-        players={players}
-        currentTurn={currentTurn}
-        isHost={isHost}
-        onExit={onExit}
+        onLeave={onLeave}
         onEnd={onEnd}
+        isHost={isHost}
+        roomId={localStorage.getItem("roomId")}
       />
 
-      <h3 style={{ marginBottom: 8 }}>
-        Your Word: <strong>{yourWord}</strong> — {isFake ? "Fake" : "Genuine"}
-      </h3>
+      <PlayerList players={players} currentTurn={currentTurn} />
 
-      <WordDisplay words={words} />
+      <WordDisplay word={word} isFake={isFake} words={words} />
 
-      <h4 style={{ marginTop: 20 }}>Chat:</h4>
       <ChatBox chat={chat} />
 
       <InputBar
         message={message}
-        setMessage={setMessage}
+        onChange={onMessageChange}
         onSend={onSend}
         disabled={playerName !== currentTurn}
       />
     </>
   );
-}
+};
+
+export default GameScreen;
