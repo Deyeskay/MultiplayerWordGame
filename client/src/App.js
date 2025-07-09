@@ -67,9 +67,12 @@ function App() {
 
     // Rejoin automatically if session exists
     if (roomId && playerName) {
-      socket.emit("join-room", { roomId, playerName, playerUUID });
-      setStep("lobby");
+      socket.on("connect", () => {
+        socket.emit("join-room", { roomId, playerName, playerUUID });
+        setStep("lobby");
+      });
     }
+
 
     return () => socket.off();
   }, [playerName]);
