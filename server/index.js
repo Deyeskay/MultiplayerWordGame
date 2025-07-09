@@ -60,8 +60,13 @@ io.on('connection', (socket) => {
     }
 
     // Update room and chat history
-    io.to(roomId).emit("room-update", room.players);
-    io.to(socket.id).emit("chat-history", room.chat);
+    io.to(roomId).emit("room-update", room.players); 
+    
+    // Wait 100ms to ensure frontend is ready to receive
+    setTimeout(() => {
+      io.to(socket.id).emit("chat-history", room.chat);
+    }, 100);
+ 
   });
 
   socket.on("start-game", (roomId) => {
