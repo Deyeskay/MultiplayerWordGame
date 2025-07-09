@@ -37,6 +37,21 @@ io.on('connection', (socket) => {
       // Rejoin
       player.socketId = socket.id;
       io.to(roomId).emit("player-rejoined", player.name);
+
+      // ✅ Restore game state if already started
+      if (room.gameStarted) {
+        io.to(socket.id).emit("your-word", {
+          word: player.word,
+          isFake: player.isFake
+        });
+
+        const currentPlayer = room.players[room.turnIndex];
+        io.to(roomId).emit("turn-update", currentPlayer.name);
+
+        // Optional: Send back all words for consistency
+        io.to(socket.id).emit("all-words", room.players.map(p => p.word));
+      }
+
     } else {
       // New join
       player = { uuid: playerUUID, name: playerName, socketId: socket.id, word: "", isFake: false };
@@ -44,7 +59,7 @@ io.on('connection', (socket) => {
       io.to(roomId).emit("player-joined", playerName);
     }
 
-    // Update room
+    // Update room and chat history
     io.to(roomId).emit("room-update", room.players);
     io.to(socket.id).emit("chat-history", room.chat);
   });
@@ -120,6 +135,7 @@ io.on('connection', (socket) => {
     }
   });
 });
+
 server.listen(10000, () => {
   console.log('🚀 Server listening on port 10000');
 });
