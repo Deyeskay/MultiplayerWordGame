@@ -9,7 +9,8 @@ const io = new Server(server, {
   cors: { origin: '*' }
 });
 
-const rooms = {}; // { roomId: { players: [{ uuid, name, socketId }], hostUUID, gameStarted, chat } }
+const rooms = {}; // roomId: { players: [...], hostUUID, gameStarted, chat, turnIndex }
+
 const genuineWords = ["Apple", "Banana", "Mango", "Pineapple", "Orange"];
 const fakeWord = "Laptop";
 
@@ -18,6 +19,7 @@ io.on('connection', (socket) => {
 
   socket.on("join-room", ({ roomId, playerName, playerUUID }) => {
     socket.join(roomId);
+
     if (!rooms[roomId]) {
       rooms[roomId] = {
         players: [],
@@ -29,8 +31,8 @@ io.on('connection', (socket) => {
     }
 
     const room = rooms[roomId];
-
     let player = room.players.find(p => p.uuid === playerUUID);
+
     if (player) {
       // Rejoin
       player.socketId = socket.id;
@@ -54,15 +56,10 @@ io.on('connection', (socket) => {
     room.gameStarted = true;
 
     const shuffledWords = [...genuineWords, fakeWord].sort(() => 0.5 - Math.random()).slice(0, room.players.length);
-
-    room.players.forEach((p, index) => {
-      p.word = shuffledWords[index];
-      p.isFake = p.word === fakeWord;
-
-      io.to(p.socketId).emit("your-word", {
-        word: p.word,
-        isFake: p.isFake
-      });
+    room.players.forEach((p, i) => {
+      p.word = shuffledWords[i];
+      p.isFake = (p.word === fakeWord);
+      io.to(p.socketId).emit("your-word", { word: p.word, isFake: p.isFake });
     });
 
     io.to(roomId).emit("all-words", room.players.map(p => p.word));
@@ -87,18 +84,16 @@ io.on('connection', (socket) => {
     io.to(roomId).emit("turn-update", nextPlayer.name);
   });
 
-  socket.on("leave-room", ({ roomId, playerUUID, playerName }) => {
+  socket.on("leave-room", ({ roomId, playerUUID, playerName, socketId }) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    // Remove player
     room.players = room.players.filter(p => p.uuid !== playerUUID);
 
-    // Update others
-    io.to(roomId).emit("player-left", playerName);
+    // Notify everyone except the leaving player
+    socket.to(roomId).emit("player-left", { name: playerName, id: socketId });
     io.to(roomId).emit("room-update", room.players);
 
-    // Clean up empty room
     if (room.players.length === 0) {
       delete rooms[roomId];
     }
@@ -114,19 +109,17 @@ io.on('connection', (socket) => {
 
   socket.on("disconnect", () => {
     console.log("🔴 Socket disconnected:", socket.id);
-
     for (const roomId in rooms) {
       const room = rooms[roomId];
       const player = room.players.find(p => p.socketId === socket.id);
       if (player) {
-        // Don't remove from room immediately (they may rejoin)
+        // Keep in list; allow reconnection
         io.to(roomId).emit("room-update", room.players);
         break;
       }
     }
   });
 });
-
 server.listen(10000, () => {
   console.log('🚀 Server listening on port 10000');
 });
