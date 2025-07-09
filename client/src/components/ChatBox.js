@@ -1,11 +1,25 @@
 import React from 'react';
 
-export default function ChatBox({ chat }) {
+function ChatBox({ chat }) {
   return (
-    <div style={{ border: '1px solid #ccc', padding: 10, borderRadius: 5, height: 200, overflowY: 'auto', marginBottom: 10 }}>
+    <div style={styles.chatBox}>
       {chat.map((msg, i) => (
         <p key={i}><strong>{msg.playerName}:</strong> {msg.message}</p>
       ))}
     </div>
   );
 }
+
+const styles = {
+  chatBox: {
+    border: "1px solid #ccc",
+    borderRadius: 5,
+    padding: 10,
+    height: 200,
+    overflowY: "auto",
+    background: "#fafafa",
+    marginBottom: 10
+  }
+};
+
+export default ChatBox;

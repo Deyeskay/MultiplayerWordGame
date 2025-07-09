@@ -1,16 +1,42 @@
 import React from 'react';
 
-export default function Modal({ message, onClose }) {
+function Modal({ message, onClose }) {
   return (
-    <div style={{
-      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1000
-    }}>
-      <div style={{ background: "#fff", padding: 20, borderRadius: 10 }}>
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
         <p>{message}</p>
-        <button onClick={onClose}>OK</button>
+        <button onClick={onClose} style={styles.button}>OK</button>
       </div>
     </div>
   );
 }
+
+const styles = {
+  overlay: {
+    position: "fixed",
+    top: 0, left: 0, bottom: 0, right: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999
+  },
+  modal: {
+    background: "#fff",
+    padding: 30,
+    borderRadius: 8,
+    textAlign: "center",
+    maxWidth: 300
+  },
+  button: {
+    marginTop: 10,
+    padding: "10px 20px",
+    fontSize: 16,
+    borderRadius: 5,
+    backgroundColor: "#007bff",
+    color: "#fff",
+    border: "none"
+  }
+};
+
+export default Modal;

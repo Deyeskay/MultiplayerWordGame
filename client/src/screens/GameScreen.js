@@ -5,7 +5,8 @@ import WordDisplay from '../components/WordDisplay';
 import ChatBox from '../components/ChatBox';
 import InputBar from '../components/InputBar';
 
-const GameScreen = ({
+function GameScreen({
+  roomId,
   playerName,
   currentTurn,
   word,
@@ -18,20 +19,16 @@ const GameScreen = ({
   onLeave,
   onEnd,
   isHost,
-  players = []
-}) => {
-  if (!word || !Array.isArray(words) || words.length === 0) {
-    return <div>Loading game...</div>; // avoid blank screen
-  }
-
+  players
+}) {
   return (
-    <>
+    <div style={{ padding: 10 }}>
       <TopBar
+        roomId={roomId}
         playerName={playerName}
+        isHost={isHost}
         onLeave={onLeave}
         onEnd={onEnd}
-        isHost={isHost}
-        roomId={localStorage.getItem("roomId")}
       />
 
       <PlayerList players={players} currentTurn={currentTurn} />
@@ -44,10 +41,10 @@ const GameScreen = ({
         message={message}
         onChange={onMessageChange}
         onSend={onSend}
-        disabled={playerName !== currentTurn}
+        isDisabled={playerName !== currentTurn}
       />
-    </>
+    </div>
   );
-};
+}
 
 export default GameScreen;

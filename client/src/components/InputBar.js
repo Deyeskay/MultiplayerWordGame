@@ -1,27 +1,22 @@
 import React from 'react';
 
-export default function InputBar({ value, onChange, onSend, disabled }) {
+function InputBar({ message, onChange, onSend, isDisabled }) {
   return (
-    <div>
+    <div style={{ display: 'flex', gap: 10 }}>
       <input
+        style={styles.input}
         placeholder="Type your hint..."
-        style={{ padding: 10, fontSize: 16, width: "80%", borderRadius: 5, border: "1px solid #ccc" }}
-        value={value}
+        value={message}
         onChange={onChange}
-        disabled={disabled}
+        disabled={isDisabled}
       />
       <button
         onClick={onSend}
-        disabled={disabled}
+        disabled={isDisabled}
         style={{
-          marginLeft: 10,
-          padding: "10px 20px",
-          borderRadius: 5,
-          backgroundColor: "#007bff",
-          color: "white",
-          border: "none",
-          opacity: disabled ? 0.5 : 1,
-          cursor: disabled ? "not-allowed" : "pointer"
+          ...styles.button,
+          opacity: isDisabled ? 0.5 : 1,
+          cursor: isDisabled ? "not-allowed" : "pointer"
         }}
       >
         Send
@@ -29,3 +24,23 @@ export default function InputBar({ value, onChange, onSend, disabled }) {
     </div>
   );
 }
+
+const styles = {
+  input: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    border: "1px solid #ccc",
+    fontSize: 16
+  },
+  button: {
+    padding: "10px 20px",
+    fontSize: 16,
+    borderRadius: 5,
+    backgroundColor: "#007bff",
+    color: "#fff",
+    border: "none"
+  }
+};
+
+export default InputBar;
