@@ -1,6 +1,7 @@
 // client/src/App.js
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import './index.css';
 
 const socket = io("https://multiplayerwordgame.onrender.com/");
 
@@ -16,10 +17,14 @@ function App() {
   const [message, setMessage] = useState("");
   const [currentTurn, setCurrentTurn] = useState("");
   const [isHost, setIsHost] = useState(false);
+  const [modalMsg, setModalMsg] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     socket.on("room-update", players => {
       setPlayers(players);
+      if (players[0]?.name === playerName) setIsHost(true);
     });
 
     socket.on("your-word", ({ word, isFake }) => {
@@ -33,18 +38,28 @@ function App() {
     socket.on("new-message", msg => setChat(prev => [...prev, msg]));
     socket.on("turn-update", name => setCurrentTurn(name));
 
-    socket.on("player-joined", name => alert(`✅ ${name} joined the game.`));
-    socket.on("player-left", name => alert(`⚠️ ${name} has left the game.`));
-    socket.on("player-rejoined", name => alert(`🔄 ${name} rejoined the game.`));
+    socket.on("player-joined", name => {
+      if (name !== playerName) showModalNow(`✅ ${name} joined the game.`);
+      else showToast("You joined the game.");
+    });
+
+    socket.on("player-left", name => showModalNow(`⚠️ ${name} left the game.`));
+    socket.on("player-rejoined", name => showModalNow(`🔄 ${name} rejoined the game.`));
+
     socket.on("game-ended", () => {
-      alert("⚠️ Host ended the game.");
-      resetGame();
+      showModalNow("⚠️ Host ended the game.");
+      setTimeout(() => resetGame(), 500);
     });
 
     return () => socket.off();
-  }, []);
+  }, [playerName]);
 
-  function resetGame() {
+  const showModalNow = (msg) => {
+    setModalMsg(msg);
+    setShowModal(true);
+  };
+
+  const resetGame = () => {
     setStep("join");
     setPlayerName("");
     setRoomId("");
@@ -55,41 +70,39 @@ function App() {
     setIsFake(false);
     setCurrentTurn("");
     setIsHost(false);
-  }
+  };
 
-  function joinRoom() {
-    if (!roomId || !playerName) return alert("Enter Room ID and Name");
+  const joinRoom = () => {
+    if (!roomId || !playerName) return showModalNow("Enter Room ID and Name");
     socket.emit("join-room", { roomId, playerName });
     setStep("lobby");
-    setIsHost(false); // will be updated based on hostId later
-  }
+  };
 
-  function startGame() {
+  const startGame = () => {
     socket.emit("start-game", roomId);
-    if (players.length && players[0]?.name === playerName) {
-      setIsHost(true);
-    }
-  }
+  };
 
-  function sendMessage() {
+  const sendMessage = () => {
     if (!message || playerName !== currentTurn) return;
     socket.emit("send-message", { roomId, playerName, message });
     setMessage("");
-  }
+  };
 
-  function endGame() {
+  const endGame = () => {
     if (window.confirm("Are you sure you want to end the game?")) {
       socket.emit("end-game", roomId);
-      resetGame();
     }
-  }
+  };
 
-  function exitGame() {
-    if (window.confirm("Do you want to exit this game?")) {
-      socket.emit("leave-room", { roomId, playerName });
-      resetGame();
-    }
-  }
+  const exitGame = () => {
+    socket.emit("leave-room", { roomId, playerName });
+    resetGame();
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  };
 
   return (
     <div style={styles.container}>
@@ -97,18 +110,8 @@ function App() {
 
       {step === "join" && (
         <>
-          <input
-            placeholder="Room ID"
-            value={roomId}
-            onChange={e => setRoomId(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            placeholder="Your Name"
-            value={playerName}
-            onChange={e => setPlayerName(e.target.value)}
-            style={styles.input}
-          />
+          <input placeholder="Room ID" value={roomId} onChange={e => setRoomId(e.target.value)} style={styles.input} />
+          <input placeholder="Your Name" value={playerName} onChange={e => setPlayerName(e.target.value)} style={styles.input} />
           <button onClick={joinRoom} style={styles.button}>Join Room</button>
         </>
       )}
@@ -116,9 +119,9 @@ function App() {
       {step === "lobby" && (
         <>
           <h3>Room ID: {roomId}</h3>
-          <h4>Players in Room:</h4>
+          <h4>Players:</h4>
           <ul>{players.map(p => <li key={p.id}>{p.name}</li>)}</ul>
-          <button onClick={startGame} style={styles.button}>Start Game</button>
+          {isHost && <button onClick={startGame} style={styles.button}>Start Game</button>}
           <button onClick={exitGame} style={styles.exitButton}>Exit</button>
         </>
       )}
@@ -127,7 +130,7 @@ function App() {
         <>
           <div style={styles.topBar}>
             <div style={styles.leftList}>
-              {players.map((p, i) => (
+              {players.map((p) => (
                 <span
                   key={p.id}
                   style={{
@@ -147,14 +150,9 @@ function App() {
             </div>
           </div>
 
-          <div style={{ marginBottom: 20 }}>
-            <h3>Your Word: <strong>{yourWord}</strong> ({isFake ? "Fake" : "Genuine"})</h3>
-            <h4>Words This Round:</h4>
-            <div style={styles.wordRow}>
-              {words.map((w, i) => (
-                <div key={i} style={styles.wordBox}>{w}</div>
-              ))}
-            </div>
+          <h3>Your Word: <strong>{yourWord}</strong> — {isFake ? "Fake" : "Genuine"}</h3>
+          <div style={styles.wordRow}>
+            {words.map((w, i) => <div key={i} style={styles.wordBox}>{w}</div>)}
           </div>
 
           <h4>Chat:</h4>
@@ -163,6 +161,7 @@ function App() {
               <p key={i}><strong>{msg.playerName}:</strong> {msg.message}</p>
             ))}
           </div>
+
           <input
             placeholder="Type your hint..."
             style={styles.input}
@@ -183,6 +182,17 @@ function App() {
           </button>
         </>
       )}
+
+      {showModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <p>{modalMsg}</p>
+            <button onClick={() => setShowModal(false)} style={styles.button}>OK</button>
+          </div>
+        </div>
+      )}
+
+      {toast && <div style={styles.toast}>{toast}</div>}
     </div>
   );
 }
@@ -239,7 +249,8 @@ const styles = {
   wordRow: {
     display: "flex",
     flexWrap: "wrap",
-    gap: 10
+    gap: 10,
+    marginBottom: 15
   },
   wordBox: {
     padding: "10px 20px",
@@ -267,6 +278,33 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: 10
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0, left: 0, bottom: 0, right: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999
+  },
+  modal: {
+    background: "#fff",
+    padding: 30,
+    borderRadius: 8,
+    textAlign: "center",
+    maxWidth: 300
+  },
+  toast: {
+    position: "fixed",
+    bottom: 20,
+    right: 20,
+    background: "#333",
+    color: "#fff",
+    padding: "10px 20px",
+    borderRadius: 6,
+    fontSize: 14,
+    zIndex: 1000
   }
 };
 
