@@ -51,7 +51,10 @@ function App() {
     });
 
     socket.on("all-words", setWords);
-    socket.on("chat-history", setChat);
+    socket.on("chat-history", chatData => {
+      setChat(chatData); // ✅ Replace instead of appending. This is correct.
+    });
+
     socket.on("new-message", msg => setChat(prev => [...prev, msg]));
     socket.on("turn-update", name => setCurrentTurn(name));
 
@@ -66,8 +69,14 @@ function App() {
     });
 
     socket.on("player-rejoined", name => {
-      if (name !== playerName) showModalNow(`🔄 ${name} rejoined the game.`);
+      if (name === playerName) {
+        // ✅ Don't reset state; we're the one rejoining
+        showToast("You rejoined the game");
+      } else {
+        showModalNow(`🔄 ${name} rejoined the game.`);
+      }
     });
+
 
     socket.on("game-ended", (hostName) => {
       const msg = hostName === playerName
