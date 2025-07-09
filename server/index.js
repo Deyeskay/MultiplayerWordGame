@@ -21,35 +21,48 @@ function generateWords() {
 }
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('🔌 User connected:', socket.id);
 
   socket.on('join-room', ({ roomId, playerName }) => {
+    console.log(`🚪 ${playerName} joining room ${roomId}`);
     socket.join(roomId);
+
     if (!rooms[roomId]) {
-      rooms[roomId] = {
-        players: [],
-        gameStarted: false
-      };
+      rooms[roomId] = { players: [], gameStarted: false };
     }
 
-    const player = { id: socket.id, name: playerName, word: null, isFake: false };
-    rooms[roomId].players.push(player);
+    const player = {
+      id: socket.id,
+      name: playerName,
+      word: null,
+      isFake: false
+    };
+
+    // prevent duplicates
+    if (!rooms[roomId].players.find(p => p.id === socket.id)) {
+      rooms[roomId].players.push(player);
+    }
 
     io.to(roomId).emit('room-update', rooms[roomId].players);
   });
 
   socket.on('start-game', (roomId) => {
-    const players = rooms[roomId].players;
+    const players = rooms[roomId]?.players || [];
     const words = generateWords();
-    for (let i = 0; i < players.length; i++) {
-      players[i].word = words[i];
-      players[i].isFake = (words[i] === "Laptop");
-      io.to(players[i].id).emit('your-word', {
-        word: words[i],
-        isFake: players[i].isFake
-      });
-    }
 
+    players.forEach((player, index) => {
+      const word = words[index];
+      player.word = word;
+      player.isFake = (word === "Laptop");
+
+      // Send word privately
+      io.to(player.id).emit('your-word', {
+        word,
+        isFake: player.isFake
+      });
+    });
+
+    // Send word list to everyone
     io.to(roomId).emit('all-words', words);
   });
 
@@ -63,12 +76,23 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     for (const roomId in rooms) {
+      const before = rooms[roomId].players.length;
       rooms[roomId].players = rooms[roomId].players.filter(p => p.id !== socket.id);
-      io.to(roomId).emit('room-update', rooms[roomId].players);
+      const after = rooms[roomId].players.length;
+
+      if (before !== after) {
+        console.log(`❌ Player disconnected from ${roomId}`);
+        io.to(roomId).emit('room-update', rooms[roomId].players);
+      }
+
+      // Optionally cleanup empty rooms
+      if (rooms[roomId].players.length === 0) {
+        delete rooms[roomId];
+      }
     }
   });
 });
 
 server.listen(10000, () => {
-  console.log('Server running on port 10000');
+  console.log('🚀 Server running on port 10000');
 });
