@@ -1,9 +1,11 @@
+// client/src/App.js
+
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import './index.css';
 import { v4 as uuidv4 } from 'uuid';
 
-const socket = io("https://multiplayerwordgame.onrender.com/");
+const socket = io("https://multiplayerwordgame.onrender.com");
 
 function App() {
   const [step, setStep] = useState("join");
@@ -17,19 +19,24 @@ function App() {
   const [message, setMessage] = useState("");
   const [currentTurn, setCurrentTurn] = useState("");
   const [isHost, setIsHost] = useState(false);
+
   const [modalMsg, setModalMsg] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState("");
 
-  const getUUID = () => {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+
+  const playerUUID = getOrCreateUUID();
+
+  function getOrCreateUUID() {
     let id = localStorage.getItem("playerUUID");
     if (!id) {
       id = uuidv4();
       localStorage.setItem("playerUUID", id);
     }
     return id;
-  };
-  const playerUUID = getUUID();
+  }
 
   useEffect(() => {
     socket.on("room-update", players => {
@@ -49,15 +56,23 @@ function App() {
     socket.on("turn-update", name => setCurrentTurn(name));
 
     socket.on("player-joined", name => {
-      if (name !== playerName) showModalNow(`✅ ${name} joined the game.`);
-      else showToast("You joined the game.");
+      if (name === playerName) showToast("You joined the game");
+      else showModalNow(`✅ ${name} joined the game.`);
     });
 
-    socket.on("player-left", name => showModalNow(`⚠️ ${name} left the game.`));
-    socket.on("player-rejoined", name => showModalNow(`🔄 ${name} rejoined the game.`));
+    socket.on("player-left", name => {
+      if (name !== playerName) showModalNow(`⚠️ ${name} left the game.`);
+    });
 
-    socket.on("game-ended", () => {
-      showModalNow("⚠️ Host ended the game.");
+    socket.on("player-rejoined", name => {
+      if (name !== playerName) showModalNow(`🔄 ${name} rejoined the game.`);
+    });
+
+    socket.on("game-ended", (hostName) => {
+      const msg = hostName === playerName
+        ? "⚠️ You ended the game."
+        : `⚠️ Host ${hostName} ended the game.`;
+      showModalNow(msg);
       setTimeout(() => resetGame(), 500);
     });
 
@@ -88,9 +103,7 @@ function App() {
     setStep("lobby");
   };
 
-  const startGame = () => {
-    socket.emit("start-game", roomId);
-  };
+  const startGame = () => socket.emit("start-game", roomId);
 
   const sendMessage = () => {
     if (!message || playerName !== currentTurn) return;
@@ -98,18 +111,35 @@ function App() {
     setMessage("");
   };
 
-  const endGame = () => {
-    socket.emit("end-game", roomId);
+  const confirmLeave = () => {
+    setConfirmAction(() => () => {
+      socket.emit("leave-room", { roomId, playerUUID, playerName });
+      showToast("You left the game");
+      resetGame();
+    });
+    setShowConfirm(true);
   };
 
-  const exitGame = () => {
-    socket.emit("leave-room", { roomId, playerUUID, playerName });
-    resetGame();
+  const confirmEnd = () => {
+    setConfirmAction(() => () => {
+      socket.emit("end-game", { roomId, hostName: playerName });
+    });
+    setShowConfirm(true);
   };
 
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
+  };
+
+  const cancelConfirm = () => {
+    setShowConfirm(false);
+    setConfirmAction(null);
+  };
+
+  const proceedConfirm = () => {
+    if (confirmAction) confirmAction();
+    cancelConfirm();
   };
 
   return (
@@ -130,7 +160,7 @@ function App() {
           <h4>Players:</h4>
           <ul>{players.map(p => <li key={p.uuid}>{p.name}</li>)}</ul>
           {isHost && <button onClick={startGame} style={styles.button}>Start Game</button>}
-          <button onClick={exitGame} style={styles.exitButton}>Exit</button>
+          <button onClick={confirmLeave} style={styles.exitButton}>Exit</button>
         </>
       )}
 
@@ -153,8 +183,8 @@ function App() {
             </div>
             <div style={styles.rightInfo}>
               <strong>{playerName}</strong> 👤
-              <button onClick={exitGame} style={styles.exitSmall}>Exit</button>
-              {isHost && <button onClick={endGame} style={styles.exitSmall}>End</button>}
+              <button onClick={confirmLeave} style={styles.exitSmall}>Exit</button>
+              {isHost && <button onClick={confirmEnd} style={styles.exitSmall}>End</button>}
             </div>
           </div>
 
@@ -201,10 +231,21 @@ function App() {
       )}
 
       {toast && <div style={styles.toast}>{toast}</div>}
+
+      {showConfirm && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <p>Are you sure?</p>
+            <button onClick={proceedConfirm} style={{ ...styles.button, marginRight: 10 }}>Yes</button>
+            <button onClick={cancelConfirm} style={styles.exitSmall}>No</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// Reuse previous styles as-is
 const styles = {
   container: {
     padding: 20,
