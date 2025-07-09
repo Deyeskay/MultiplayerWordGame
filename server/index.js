@@ -37,21 +37,25 @@ io.on('connection', (socket) => {
       // ✅ Rejoin
       player.socketId = socket.id;
 
-      // Resend personal game state
       io.to(socket.id).emit("chat-history", room.chat);
-      io.to(socket.id).emit("your-word", {
-        word: player.word,
-        isFake: player.isFake
-      });
 
-      io.to(socket.id).emit("all-words", room.players.map(p => p.word));
-      const currentPlayer = room.players[room.turnIndex];
-      if (currentPlayer) {
-        io.to(socket.id).emit("turn-update", currentPlayer.name);
+      if (room.gameStarted) {
+        io.to(socket.id).emit("your-word", {
+          word: player.word,
+          isFake: player.isFake
+        });
+
+        io.to(socket.id).emit("all-words", room.players.map(p => p.word));
+
+        const currentPlayer = room.players[room.turnIndex];
+        if (currentPlayer) {
+          io.to(socket.id).emit("turn-update", currentPlayer.name);
+        }
       }
 
       io.to(roomId).emit("player-rejoined", player.name);
-    } else {
+    }
+    else {
       // New Join
       player = {
         uuid: playerUUID,
