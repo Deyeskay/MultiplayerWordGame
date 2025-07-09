@@ -1,7 +1,7 @@
-// client/src/App.js
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import './index.css';
+import { v4 as uuidv4 } from 'uuid';
 
 const socket = io("https://multiplayerwordgame.onrender.com/");
 
@@ -21,10 +21,20 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState("");
 
+  const getUUID = () => {
+    let id = localStorage.getItem("playerUUID");
+    if (!id) {
+      id = uuidv4();
+      localStorage.setItem("playerUUID", id);
+    }
+    return id;
+  };
+  const playerUUID = getUUID();
+
   useEffect(() => {
     socket.on("room-update", players => {
       setPlayers(players);
-      if (players[0]?.name === playerName) setIsHost(true);
+      if (players[0]?.uuid === playerUUID) setIsHost(true);
     });
 
     socket.on("your-word", ({ word, isFake }) => {
@@ -74,7 +84,7 @@ function App() {
 
   const joinRoom = () => {
     if (!roomId || !playerName) return showModalNow("Enter Room ID and Name");
-    socket.emit("join-room", { roomId, playerName });
+    socket.emit("join-room", { roomId, playerName, playerUUID });
     setStep("lobby");
   };
 
@@ -89,13 +99,11 @@ function App() {
   };
 
   const endGame = () => {
-    if (window.confirm("Are you sure you want to end the game?")) {
-      socket.emit("end-game", roomId);
-    }
+    socket.emit("end-game", roomId);
   };
 
   const exitGame = () => {
-    socket.emit("leave-room", { roomId, playerName });
+    socket.emit("leave-room", { roomId, playerUUID, playerName });
     resetGame();
   };
 
@@ -120,7 +128,7 @@ function App() {
         <>
           <h3>Room ID: {roomId}</h3>
           <h4>Players:</h4>
-          <ul>{players.map(p => <li key={p.id}>{p.name}</li>)}</ul>
+          <ul>{players.map(p => <li key={p.uuid}>{p.name}</li>)}</ul>
           {isHost && <button onClick={startGame} style={styles.button}>Start Game</button>}
           <button onClick={exitGame} style={styles.exitButton}>Exit</button>
         </>
@@ -132,7 +140,7 @@ function App() {
             <div style={styles.leftList}>
               {players.map((p) => (
                 <span
-                  key={p.id}
+                  key={p.uuid}
                   style={{
                     ...styles.playerTag,
                     backgroundColor: p.name === currentTurn ? "#4CAF50" : "#ccc",

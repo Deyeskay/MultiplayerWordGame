@@ -9,7 +9,7 @@ const io = new Server(server, {
   cors: { origin: "*" },
 });
 
-const rooms = {}; // Room state
+const rooms = {}; // All room data
 
 function generateWords() {
   const genuineWords = ["Apple", "Banana", "Mango", "Pineapple", "Orange"];
@@ -21,7 +21,7 @@ function generateWords() {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join-room", ({ roomId, playerName }) => {
+  socket.on("join-room", ({ roomId, playerName, playerUUID }) => {
     socket.join(roomId);
 
     if (!rooms[roomId]) {
@@ -29,18 +29,19 @@ io.on("connection", (socket) => {
         players: [],
         chat: [],
         gameStarted: false,
-        hostId: socket.id,
+        hostId: playerUUID,
         currentTurnIndex: 0,
         words: [],
       };
     }
 
     const room = rooms[roomId];
-    let existing = room.players.find((p) => p.name === playerName);
+    let player = room.players.find(p => p.uuid === playerUUID);
 
-    if (!existing) {
-      const player = {
+    if (!player) {
+      player = {
         id: socket.id,
+        uuid: playerUUID,
         name: playerName,
         word: null,
         isFake: false,
@@ -48,7 +49,7 @@ io.on("connection", (socket) => {
       room.players.push(player);
       io.to(roomId).emit("player-joined", playerName);
     } else {
-      existing.id = socket.id;
+      player.id = socket.id; // Update socket ID for reconnection
       io.to(roomId).emit("player-rejoined", playerName);
     }
 
@@ -56,13 +57,13 @@ io.on("connection", (socket) => {
     socket.emit("chat-history", room.chat);
 
     if (room.gameStarted) {
-      const currentPlayer = room.players[room.currentTurnIndex];
+      const current = room.players[room.currentTurnIndex];
       socket.emit("your-word", {
-        word: existing?.word,
-        isFake: existing?.isFake,
+        word: player.word,
+        isFake: player.isFake,
       });
       socket.emit("all-words", room.words);
-      io.to(roomId).emit("turn-update", currentPlayer?.name);
+      io.to(roomId).emit("turn-update", current.name);
     }
   });
 
@@ -95,16 +96,9 @@ io.on("connection", (socket) => {
     room.chat.push(msg);
     io.to(roomId).emit("new-message", msg);
 
-    // Advance turn
-    if (room.gameStarted) {
-      room.currentTurnIndex = (room.currentTurnIndex + 1) % room.players.length;
-      const nextPlayer = room.players[room.currentTurnIndex];
-      io.to(roomId).emit("turn-update", nextPlayer.name);
-    }
-  });
-
-  socket.on("vote", ({ roomId, votedPlayer }) => {
-    io.to(roomId).emit("vote-update", votedPlayer);
+    room.currentTurnIndex = (room.currentTurnIndex + 1) % room.players.length;
+    const nextPlayer = room.players[room.currentTurnIndex];
+    io.to(roomId).emit("turn-update", nextPlayer.name);
   });
 
   socket.on("end-game", (roomId) => {
@@ -114,10 +108,10 @@ io.on("connection", (socket) => {
     delete rooms[roomId];
   });
 
-  socket.on("leave-room", ({ roomId, playerName }) => {
+  socket.on("leave-room", ({ roomId, playerUUID, playerName }) => {
     const room = rooms[roomId];
     if (!room) return;
-    room.players = room.players.filter((p) => p.id !== socket.id);
+    room.players = room.players.filter(p => p.uuid !== playerUUID);
     io.to(roomId).emit("room-update", room.players);
     io.to(roomId).emit("player-left", playerName);
   });
@@ -125,17 +119,20 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     for (const roomId in rooms) {
       const room = rooms[roomId];
-      const leavingPlayer = room.players.find((p) => p.id === socket.id);
-      if (!leavingPlayer) continue;
+      const player = room.players.find(p => p.id === socket.id);
+      if (!player) continue;
 
-      room.players = room.players.filter((p) => p.id !== socket.id);
-      io.to(roomId).emit("room-update", room.players);
+      const playerName = player.name;
+      const playerUUID = player.uuid;
+      const isHost = playerUUID === room.hostId;
 
-      if (socket.id === room.hostId) {
+      if (isHost) {
         io.to(roomId).emit("game-ended");
         delete rooms[roomId];
       } else {
-        io.to(roomId).emit("player-left", leavingPlayer.name);
+        room.players = room.players.filter(p => p.id !== socket.id);
+        io.to(roomId).emit("room-update", room.players);
+        io.to(roomId).emit("player-left", playerName);
       }
     }
   });
