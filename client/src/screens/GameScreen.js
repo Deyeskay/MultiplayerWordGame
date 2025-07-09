@@ -1,51 +1,52 @@
 import React from "react";
-import TopBar from "../components/TopBar";
-import WordDisplay from "../components/WordDisplay";
 import ChatBox from "../components/ChatBox";
+import WordDisplay from "../components/WordDisplay";
 import InputBar from "../components/InputBar";
+import TopBar from "../components/TopBar";
 
-const GameScreen = ({
-  roomId,
+export default function GameScreen({
   playerName,
+  roomId,
+  isHost,
   players,
+  currentTurn,
   yourWord,
   isFake,
   words,
   chat,
   message,
-  currentTurn,
-  onSendMessage,
   setMessage,
-  onLeave,
+  onSend,
+  onExit,
   onEnd,
-  isHost
-}) => {
+}) {
   return (
-    <div className="screen-container">
+    <>
       <TopBar
-        roomId={roomId}
         playerName={playerName}
+        roomId={roomId}
         players={players}
         currentTurn={currentTurn}
-        onLeave={onLeave}
-        onEnd={onEnd}
         isHost={isHost}
+        onExit={onExit}
+        onEnd={onEnd}
       />
 
-      <WordDisplay word={yourWord} isFake={isFake} words={words} />
+      <h3 style={{ marginBottom: 8 }}>
+        Your Word: <strong>{yourWord}</strong> — {isFake ? "Fake" : "Genuine"}
+      </h3>
 
-      <div className="chat-section">
-        <h4>Chat:</h4>
-        <ChatBox chat={chat} />
-        <InputBar
-          message={message}
-          setMessage={setMessage}
-          onSend={onSendMessage}
-          disabled={playerName !== currentTurn}
-        />
-      </div>
-    </div>
+      <WordDisplay words={words} />
+
+      <h4 style={{ marginTop: 20 }}>Chat:</h4>
+      <ChatBox chat={chat} />
+
+      <InputBar
+        message={message}
+        setMessage={setMessage}
+        onSend={onSend}
+        disabled={playerName !== currentTurn}
+      />
+    </>
   );
-};
-
-export default GameScreen;
+}
