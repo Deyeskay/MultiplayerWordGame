@@ -1,1 +1,69 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/MultiplayerWordGame/favicon.ico"/><title>Multiplayer Word Game</title><script defer="defer" src="/MultiplayerWordGame/static/js/main.549f9bc6.js"></script><link href="/MultiplayerWordGame/static/css/main.5b16e471.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Room Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body { font-family: Arial; margin: 0; padding: 10px; }
+    #chat { display: none; }
+    #messages { height: 60vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; }
+    input, button { width: 100%; padding: 10px; margin-top: 5px; }
+    .system { color: gray; font-style: italic; }
+    .user { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div id="join">
+  <input id="username" placeholder="Username" />
+  <input id="room" placeholder="Room ID" />
+  <button onclick="joinRoom()">Join Room</button>
+</div>
+
+<div id="chat">
+  <div id="messages"></div>
+  <input id="msg" placeholder="Type message..." />
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+  const socket = io("https://multiplayerwordgame.onrender.com");
+
+  function joinRoom() {
+    const username = document.getElementById("username").value.trim();
+    const roomId = document.getElementById("room").value.trim();
+    if (!username || !roomId) return;
+
+    socket.emit("join-room", { username, roomId });
+
+    document.getElementById("join").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+  }
+
+  function sendMessage() {
+    const msg = document.getElementById("msg");
+    if (!msg.value) return;
+    socket.emit("send-message", msg.value);
+    msg.value = "";
+  }
+
+  socket.on("chat-message", ({ username, message }) => {
+    addMessage(`<span class="user">${username}:</span> ${message}`);
+  });
+
+  socket.on("system-message", ({ message }) => {
+    addMessage(`<span class="system">${message}</span>`);
+  });
+
+  function addMessage(html) {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    const messages = document.getElementById("messages");
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+</script>
+
+</body>
+</html>
