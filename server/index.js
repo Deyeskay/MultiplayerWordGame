@@ -1,151 +1,48 @@
-const express = require('express');
-const http = require('http');
-const cors = require('cors');
-const { Server } = require('socket.io');
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: {
+    origin: "*"
+  }
 });
 
-const rooms = {}; // roomId: { players: [...], hostUUID, gameStarted, chat, turnIndex }
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
 
-const genuineWords = ["Apple", "Banana", "Mango", "Pineapple", "Orange"];
-const fakeWord = "Laptop";
-
-io.on('connection', (socket) => {
-  console.log("🟢 Socket connected:", socket.id);
-
-  socket.on("join-room", ({ roomId, playerName, playerUUID }) => {
+  socket.on("join-room", ({ username, roomId }) => {
     socket.join(roomId);
+    socket.username = username;
+    socket.roomId = roomId;
 
-    if (!rooms[roomId]) {
-      rooms[roomId] = {
-        players: [],
-        hostUUID: playerUUID,
-        gameStarted: false,
-        chat: [],
-        turnIndex: 0
-      };
-    }
-
-    const room = rooms[roomId];
-    let player = room.players.find(p => p.uuid === playerUUID);
-
-    if (player) {
-      // ✅ Rejoin
-      player.socketId = socket.id;
-
-      io.to(socket.id).emit("chat-history", room.chat);
-
-      if (room.gameStarted) {
-        io.to(socket.id).emit("your-word", {
-          word: player.word,
-          isFake: player.isFake
-        });
-
-        io.to(socket.id).emit("all-words", room.players.map(p => p.word));
-
-        const currentPlayer = room.players[room.turnIndex];
-        if (currentPlayer) {
-          io.to(socket.id).emit("turn-update", currentPlayer.name);
-        }
-      }
-
-      io.to(roomId).emit("player-rejoined", player.name);
-    }
-    else {
-      // New Join
-      player = {
-        uuid: playerUUID,
-        name: playerName,
-        socketId: socket.id,
-        word: "",
-        isFake: false
-      };
-      room.players.push(player);
-      io.to(roomId).emit("player-joined", playerName);
-    }
-
-    io.to(roomId).emit("room-update", room.players);
-  });
-
-  socket.on("start-game", (roomId) => {
-    const room = rooms[roomId];
-    if (!room || room.players.length === 0) return;
-
-    room.gameStarted = true;
-
-    const shuffledWords = [...genuineWords, fakeWord]
-      .sort(() => 0.5 - Math.random())
-      .slice(0, room.players.length);
-
-    room.players.forEach((p, i) => {
-      p.word = shuffledWords[i];
-      p.isFake = (p.word === fakeWord);
-      io.to(p.socketId).emit("your-word", {
-        word: p.word,
-        isFake: p.isFake
-      });
+    socket.to(roomId).emit("system-message", {
+      message: `${username} joined the room`
     });
-
-    io.to(roomId).emit("all-words", room.players.map(p => p.word));
-
-    room.turnIndex = 0;
-    const currentPlayer = room.players[room.turnIndex];
-    io.to(roomId).emit("turn-update", currentPlayer.name);
   });
 
-  socket.on("send-message", ({ roomId, playerName, message }) => {
-    const room = rooms[roomId];
-    if (!room) return;
+  socket.on("send-message", (message) => {
+    if (!socket.roomId) return;
 
-    const chatMsg = { playerName, message };
-    room.chat.push(chatMsg);
-    io.to(roomId).emit("new-message", chatMsg);
-
-    room.turnIndex = (room.turnIndex + 1) % room.players.length;
-    const nextPlayer = room.players[room.turnIndex];
-    io.to(roomId).emit("turn-update", nextPlayer.name);
-  });
-
-  socket.on("leave-room", ({ roomId, playerUUID, playerName, socketId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-
-    room.players = room.players.filter(p => p.uuid !== playerUUID);
-
-    // Notify others only
-    socket.to(roomId).emit("player-left", { name: playerName, id: socketId });
-    io.to(roomId).emit("room-update", room.players);
-
-    if (room.players.length === 0) {
-      delete rooms[roomId];
-    }
-  });
-
-  socket.on("end-game", ({ roomId, hostName }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-
-    io.to(roomId).emit("game-ended", hostName);
-    delete rooms[roomId];
+    io.to(socket.roomId).emit("chat-message", {
+      username: socket.username,
+      message
+    });
   });
 
   socket.on("disconnect", () => {
-    console.log("🔴 Socket disconnected:", socket.id);
-    for (const roomId in rooms) {
-      const room = rooms[roomId];
-      const player = room.players.find(p => p.socketId === socket.id);
-      if (player) {
-        io.to(roomId).emit("room-update", room.players);
-        break;
-      }
+    if (socket.roomId) {
+      socket.to(socket.roomId).emit("system-message", {
+        message: `${socket.username} left the room`
+      });
     }
   });
 });
 
-server.listen(10000, () => {
-  console.log('🚀 Server listening on port 10000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log("Server running on port", PORT);
 });
